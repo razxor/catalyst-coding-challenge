@@ -25,8 +25,9 @@
 	reported to STDOUT.
 	------------------------------------------------------------------------------------------------------------------------
 	*/
-	// Define Function : Get and parse parameters
+	
 	try{
+		// Define Function : Get and parse parameters
 		function cmdLineDirectives()
 		{
 			echo "----------------------------------------------------------------------------------------------------\n";
