@@ -2,8 +2,9 @@
 	//Raz Ahamed | raz.abcoder@gmail.com
 	/*
 	1. Script Task :
-	Create a PHP script, that is executed from the command line, which accepts a CSV file as input (see command
-	line directives below) and processes the CSV file. The parsed file data is to be inserted into a MySQL database.
+	* Create a PHP script, that is executed from the command line, which accepts a CSV file as input (see command
+	line directives below) and processes the CSV file. 
+	* The parsed file data is to be inserted into a MySQL database.
 	A CSV file is provided as part of this task that contains test data, the script must be able to process this file
 	appropriately.
 	----------------------------------------------------------------------------------------------------------------------
@@ -27,8 +28,9 @@
 	// Define Function : Get and parse parameters
 	function cmdLineDirectives()
 	{
+		echo "-------------------------------------------------------------------------------------------------------------------------------\n";
 		echo "Script Command Line Directives:\n";
-		echo "--------------------------------\n";
+		echo "-------------------------------------------------------------------------------------------------------------------------------\n";
 		echo "*  --file [csv file name] – this is the name of the CSV to be parsed\n";
 		echo "*  --create_table - this will cause the MySQL users table to be built (and no further action will be taken)\n";
 		echo "*  --dry_run - this will be used with the --file directive in case we want to run the script but not insert into the DB. All other functions will be executed, but the database won't be altered\n";
@@ -47,5 +49,106 @@
 	if (in_array("--help", $argv)) {
 		cmdLineDirectives();
 		exit();
+	}
+
+	// Intilize variables
+	$file        = "";
+	$createtable = false;
+	$dryrun      = false;
+	$username    = "";
+	$password    = "";
+	$host        = "";
+	$conn        = "";
+	$dbname = "catalyst";
+
+	// Filename param validate
+	if (in_array("--file", $argv)) {
+		$pos = array_search("--file", $argv);
+		if ($pos < $argc - 1) {
+			$file = $argv[$pos + 1];
+			if (!(file_exists($file) && is_file($file))) {
+				die("Info: Please provide the valid file name.\n");
+			}
+		} else {
+			die("Info: No file name provided.\n");
+		}
+	}
+
+	// Check whether dry_run was sent
+	if (in_array("--dry_run", $argv)) {
+		$dryrun = true;
+	}
+	
+	// Username parsing
+	if (in_array("-u", $argv)) {
+		$pos = array_search("-u", $argv);
+		if ($pos < $argc - 1) {
+			$username = $argv[$pos + 1];
+		}
+	}
+
+	// Password parsing  
+	if (in_array("-p", $argv)) {
+		$pos = array_search("-p", $argv);
+		if ($pos < $argc - 1) {
+			$password = $argv[$pos + 1];
+		}
+	}
+
+	// Host parsing
+	if (in_array("-h", $argv)) {
+		$pos = array_search("-h", $argv);
+		if ($pos < $argc - 1) {
+			$host = $argv[$pos + 1];
+		}
+	}
+
+	if (!$dryrun && ($username=="" || $host=="")){
+		echo "\n";
+		echo "The parameters Username and Host are required. Please try again.\n";
+		cmdLineDirectives();
+		die();		
+	}
+
+	// If run php user_upload.php --create_table -u root -h 127.0.0.1
+	if (in_array("--create_table", $argv)) {		
+		echo "--------------------\n";
+		echo "Database information\n";
+		echo "--------------------\n";
+		$conn = connection($host, $username, $password, $dbname);		
+	}
+
+	
+	
+
+	/*=================================== Creating database connection and users Table ===============================================================*/
+	function connection($host, $username, $password, $dbname)
+	{		
+		$conn = mysqli_connect($host, $username, $password, $dbname);		
+		// Check connection
+		if (!$conn) {
+			die("Error: Connection failed | ". mysqli_connect_errno() . "\n");
+		}	
+
+		// Create table users
+		$sql = "CREATE TABLE if not exists users (
+				name VARCHAR(255),
+				surname VARCHAR(255),
+				email VARCHAR(255) NOT NULL,
+				UNIQUE KEY(email)
+				)";
+		
+		if ($conn->query($sql) === TRUE) {
+			echo "Table users created successfully\n";
+		} else {
+			echo "Error creating table: " . $conn->error . "\n";
+		}
+		// truncate table users
+		$sql = "TRUNCATE TABLE users";
+		
+		if ($conn->query($sql) === FALSE) {
+			echo "Error deleting table: " . $conn->error . "\n";
+		}		
+		return $conn;		
 	}
 ?>
