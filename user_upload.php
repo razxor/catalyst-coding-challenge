@@ -27,30 +27,7 @@
 	*/
 	
 	try{
-		// Define Function : Get and parse parameters
-		function createTable($host, $username, $password, $dbname) {
-			// Create table users
-			$conn = connection($host, $username, $password, $dbname);
-			$sql = "CREATE TABLE if not exists users (
-				name VARCHAR(255),
-				surname VARCHAR(255),
-				email VARCHAR(255) NOT NULL,
-				UNIQUE KEY(email)
-				)";
-		
-			if ($conn->query($sql) === TRUE) {
-				echo "Table users created successfully\n";
-			} else {
-				echo "Error creating table: " . $conn->error . "\n";
-			}
-			// truncate table users
-			$sql = "TRUNCATE TABLE users";
-			
-			if ($conn->query($sql) === FALSE) {
-				echo "Error deleting table: " . $conn->error . "\n";
-			}	
-		}
-
+		// Define Function : Get and parse parameters		
 		function cmdLineDirectives()
 		{
 			echo "----------------------------------------------------------------------------------------------------\n";
