@@ -28,6 +28,29 @@
 	
 	try{
 		// Define Function : Get and parse parameters
+		function createTable($host, $username, $password, $dbname) {
+			// Create table users
+			$conn = connection($host, $username, $password, $dbname);
+			$sql = "CREATE TABLE if not exists users (
+				name VARCHAR(255),
+				surname VARCHAR(255),
+				email VARCHAR(255) NOT NULL,
+				UNIQUE KEY(email)
+				)";
+		
+			if ($conn->query($sql) === TRUE) {
+				echo "Table users created successfully\n";
+			} else {
+				echo "Error creating table: " . $conn->error . "\n";
+			}
+			// truncate table users
+			$sql = "TRUNCATE TABLE users";
+			
+			if ($conn->query($sql) === FALSE) {
+				echo "Error deleting table: " . $conn->error . "\n";
+			}	
+		}
+
 		function cmdLineDirectives()
 		{
 			echo "----------------------------------------------------------------------------------------------------\n";
@@ -61,14 +84,17 @@
 		$password    = "";
 		$host        = "";
 		$conn        = "";
-		$dbname = "catalyst";
+		$dbname = "candidates";
 	
 		// Filename param validate
 		if (in_array("--file", $argv)) {
 			$pos = array_search("--file", $argv);
 			if ($pos < $argc - 1) {
 				$file = $argv[$pos + 1];
+				$type = pathinfo($file);								
 				if (!(file_exists($file) && is_file($file))) {
+					die("Info: Please provide the valid file name.\n");
+				} elseif(!in_array($type['extension'], ['csv'])){
 					die("Info: Please provide the valid file name.\n");
 				}
 			} else {
@@ -103,8 +129,12 @@
 			if ($pos < $argc - 1) {
 				$host = $argv[$pos + 1];
 			}
-		}
-	
+		}		
+		// If run php user_upload.php --create_table -u root -h 127.0.0.1
+		if (in_array("--create_table", $argv)) {
+			$createtable = true;
+		}			
+		
 		if (!$dryrun && ($username=="" || $host=="")){
 			echo "\n";
 			echo "The parameters Username and Host are required. Please try again.\n";
@@ -119,59 +149,61 @@
 			cmdLineDirectives();
 			die();		
 		}	
-	
-		// If run php user_upload.php --create_table -u root -h 127.0.0.1
-		if (in_array("--create_table", $argv)) {		
-			echo "--------------------\n";
-			echo "Database Information\n";
-			echo "--------------------\n";
-			$conn = createTable($host, $username, $password, $dbname);
-			exit();	
-		}
-	
-		
-		
-	
+
+		if ($file == "" && $dryrun){
+			echo "\n";
+			//echo "Select --create_table or --dry_run, not both. Please try again.\n";
+			cmdLineDirectives();
+			die();		
+		}	
+		if (!$createtable && $file=="") {			
+			echo "\n";
+			echo "The parameter File is required. Please try again.\n";
+			cmdLineDirectives();
+			exit();				
+		}						
 		/*=================================== Creating database connection and users Table ===============================================================*/
-		function connection($host, $username, $password, $dbname)
-		{	
-			try{
-				$conn = mysqli_connect($host, $username, $password, $dbname);		
-				// Check connection
+		function connection($host, $username, $password, $dbname, $createtable)
+		{
+			try{				
+				$conn = mysqli_connect($host, $username, $password, $dbname);	
+				// Check connection					
 				if (!$conn) {
-					die("Error: Connection failed | ". mysqli_connect_errno() . "\n");
-				}				
+					die("Error. Connection failed: ". mysqli_connect_errno() . "\n");
+				}									
+				if($createtable) {
+					// Create table users
+					$sql = "CREATE TABLE if not exists users (
+						id INT(11) NOT NULL AUTO_INCREMENT,
+						name VARCHAR(255),
+						surname VARCHAR(255),
+						email VARCHAR(255) NOT NULL,
+						UNIQUE KEY(email),
+						PRIMARY KEY (id)
+						)";
+
+					if ($conn->query($sql) === TRUE) {
+					echo "Table users created successfully\n";
+					} else {
+					echo "Error creating table: " . $conn->error . "\n";
+					}
+					// truncate table users
+					$sql = "TRUNCATE TABLE users";
+
+					if ($conn->query($sql) === TRUE) {
+					} else {
+					echo "Error deleting table: " . $conn->error . "\n";
+					}
+				}						
 				return $conn;
-			} catch(Exception $e) {
+			} catch(Exception $e) {				
 				echo 'Message: ' .$e->getMessage();
-			}					
-		}
-	
-		function createTable($host, $username, $password, $dbname) {
-			// Create table users
-			$conn = connection($host, $username, $password, $dbname);
-			$sql = "CREATE TABLE if not exists users (
-				name VARCHAR(255),
-				surname VARCHAR(255),
-				email VARCHAR(255) NOT NULL,
-				UNIQUE KEY(email)
-				)";
+			}						
+		}	
 		
-			if ($conn->query($sql) === TRUE) {
-				echo "Table users created successfully\n";
-			} else {
-				echo "Error creating table: " . $conn->error . "\n";
-			}
-			// truncate table users
-			$sql = "TRUNCATE TABLE users";
-			
-			if ($conn->query($sql) === FALSE) {
-				echo "Error deleting table: " . $conn->error . "\n";
-			}	
-		}
 		if(!$dryrun) {
 			// create the connection to database			
-			$conn = connection($host, $username, $password, $dbname);
+			$conn = connection($host, $username, $password, $dbname, $createtable);
 			if($createtable) {
 				exit();
 			}
@@ -191,6 +223,7 @@
 			// Discard the first line - headers
 			$insert = 0;
 			$notinsert = 0;
+			$duplicate = 0;
 			while (!feof($fh)) {
 				// Reading CSV data line by line
 				$line   = fgets($fh);			
@@ -216,28 +249,43 @@
 					// Validate email format
 					if (filter_var($email, FILTER_VALIDATE_EMAIL)){			
 						if (!$dryrun){
-							$sql = "INSERT INTO users (name, surname, email) VALUES (?, ?, ?)";
-	
-							if($stmt  = $conn->prepare($sql)){
-								// Bind variables to the prepared statement as parameters
-								$stmt ->bind_param("sss", $name, $surname, $email);
-								$stmt ->execute();
-								$insert++;							
-							} else{
-								echo "ERROR: Could not prepare query: $sql. " . $mysqli->error . "\n";
-							}
+							try{						
+								$sql = 'SELECT id FROM `users` WHERE email = "'.$email.'" LIMIT 1';		
+								$result = mysqli_query($conn, $sql);																
+								if(isset($result->num_rows) && $result->num_rows == 0)
+								{
+									$sql = "INSERT INTO users (name, surname, email) VALUES (?, ?, ?)";	
+									if($stmt  = $conn->prepare($sql)){
+										// Bind variables to the prepared statement as parameters
+										$stmt ->bind_param("sss", $name, $surname, $email);
+										$stmt ->execute();
+										$insert++;							
+									} else{
+										echo "ERROR: Could not prepare query: $sql. " . $mysqli->error . "\n";
+									}
+								} else {
+									$duplicate++;
+									echo "Duplicate entry '". $email ."' for key 'users.email'". "\n";
+								}							
+							} catch(Exception $e){
+								die('Message: ' .$e->getMessage());
+							}							
 						} else {
 							echo $name ." | ". $surname ." | ". $email . "\n";
 						}
 					} else {
 						$notinsert++;
-						echo "ERROR: Invalid email. Record ignored: ".$name ." | ". $surname ." | ". $email . "\n";
+						echo "Invalid email - Record ignored: ".$name ." | ". $surname ." | ". $email . "\n";
 					}				
 				}
 			}
 			if(!$dryrun) {
+				echo "\n------------------------------------\n";
+				echo "Summery";
+				echo "\n------------------------------------\n";
 				echo "Records inserted successfully: ".$insert. "\n";
-				echo "Records not inserted : ".$notinsert. "\n";
+				echo "Invalid email (not inserted) : ".$notinsert. "\n";
+				echo "Duplicate email (not inserted) : ".$duplicate. "\n";
 			}
 			fclose($fh);
 		} else {
