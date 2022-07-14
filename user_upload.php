@@ -68,12 +68,16 @@
 			$pos = array_search("--file", $argv);
 			if ($pos < $argc - 1) {
 				$file = $argv[$pos + 1];
-				$type = pathinfo($file);								
-				if (!(file_exists($file) && is_file($file))) {
-					die("Info: Please provide the valid file name.\n");
-				} elseif(!in_array($type['extension'], ['csv'])){
-					die("Info: Please provide the valid file name.\n");
-				}
+				try{
+					@$type = mime_content_type($file);	
+					if (!(file_exists($file) && is_file($file))) {
+						die("Info: Please provide the valid file name.\n");
+					} elseif(!in_array($type, ['text/plain', 'text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'])){
+						die("Info: Please provide the valid file name.\n");
+					}
+				} catch(Exception $e) {
+					die('Message : '. $e->getMessage());
+				}																	
 			} else {
 				die("Info: No file name provided.\n");
 			}
@@ -143,10 +147,10 @@
 		function connection($host, $username, $password, $dbname, $createtable)
 		{
 			try{				
-				$conn = mysqli_connect($host, $username, $password, $dbname);	
+				@$conn = mysqli_connect($host, $username, $password, $dbname);	
 				// Check connection					
 				if (!$conn) {
-					die("Error. Connection failed: ". mysqli_connect_errno() . "\n");
+					die("Message: Connection failed: ". mysqli_connect_errno() . "\n");
 				}									
 				if($createtable) {
 					// Create table users
